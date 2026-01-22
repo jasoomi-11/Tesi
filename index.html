@@ -707,28 +707,31 @@ body {
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-app.js";
 import { getFirestore, doc, getDoc, updateDoc, arrayUnion, increment } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-firestore.js";
+import { getAuth } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-auth.js";
 
-/* FIREBASE CONFIG */
+/* 🔥 FIREBASE CONFIG */
 const firebaseConfig = {
   apiKey: "AIzaSyBe3E2eSUaDH5rZHguezaHjbxKmRA5QVd4",
   authDomain: "rewards-b8f54.firebaseapp.com",
   projectId: "rewards-b8f54"
 };
+
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
+const auth = getAuth(app);
 
-/* SETTINGS */
+/* ⚙️ SETTINGS */
 const COUNTDOWN = 5;
 const PLATFORM_EARNING = 0.0005;
 const DAILY_LIMIT = 120;
 const JSON_FILES = ["1.json","2.json","3.json"];
 
-/* UI */
+/* 🎯 UI ELEMENTS */
 const btn = document.getElementById("adBtn");
 const timer = document.getElementById("timer");
 const progress = document.getElementById("progress");
 
-/* URL PARAMS */
+/* 🔗 URL PARAMS */
 const params = new URLSearchParams(window.location.search);
 const uidParam = params.get("uid");
 const tokenParam = params.get("token");
@@ -739,27 +742,27 @@ if (!uidParam || !tokenParam) {
   throw new Error("Missing uid or token");
 }
 
-/* GET NEXT UNUSED LINK */
+/* 🔗 FETCH NEXT UNUSED LINK */
 async function getNextLink(userData){
   for (let file of JSON_FILES){
-    try{
-      const res = await fetch(file,{cache:"no-store"});
+    try {
+      const res = await fetch(file, { cache:"no-store" });
       const data = await res.json();
       const unused = data.filter(l => !userData.usedLinks?.includes(l));
-      if(unused.length) return unused[0];
-    }catch(e){console.error(e);}
+      if (unused.length) return unused[0];
+    } catch(e) { console.error(e); }
   }
   return null;
 }
 
-/* MAIN FUNCTION */
+/* 🔑 MAIN FUNCTION */
 async function init() {
   btn.disabled = true;
   timer.innerText = "⏳ Verifying...";
 
   const userRef = doc(db,"users",uidParam);
   const snap = await getDoc(userRef);
-  if(!snap.exists()){
+  if (!snap.exists()) {
     timer.innerText = "Unauthorized";
     return;
   }
@@ -767,8 +770,8 @@ async function init() {
   let userData = snap.data();
   const today = new Date().toISOString().slice(0,10);
 
-  /* DAILY RESET */
-  if(userData.tasksDate !== today){
+  // Daily reset
+  if (userData.tasksDate !== today){
     await updateDoc(userRef,{
       tasksDate: today,
       todayClicks: 0,
@@ -782,57 +785,56 @@ async function init() {
     userData.lockedUntil = null;
   }
 
-  /* LOCK CHECK */
-  if(userData.lockedUntil === today){
+  // Lock if already clicked today
+  if (userData.lockedUntil === today){
     btn.disabled = true;
     timer.innerText = "Come back tomorrow";
     return;
   }
 
-  /* TOKEN CHECK */
-  if(userData.usedTokens?.includes(tokenParam)){
+  // Token already used
+  if (userData.usedTokens?.includes(tokenParam)){
     btn.disabled = true;
     timer.innerText = "Already completed";
     return;
   }
 
-  /* DAILY LIMIT */
-  if(userData.todayClicks >= DAILY_LIMIT){
+  // Daily click limit
+  if (userData.todayClicks >= DAILY_LIMIT){
     btn.disabled = true;
     timer.innerText = "Daily limit reached";
     return;
   }
 
-  /* GET LINK */
+  // Get next unused link
   const nextLink = await getNextLink(userData);
-  if(!nextLink){
+  if (!nextLink){
     btn.disabled = true;
     timer.innerText = "No links available";
     return;
   }
 
-  /* COUNTDOWN */
+  // Countdown
   let sec = COUNTDOWN;
-  progress.style.width = "0%";
   timer.innerText = `⏳ Available in ${sec}s`;
-
+  progress.style.width = "0%";
   const interval = setInterval(()=>{
     sec--;
     timer.innerText = `⏳ Available in ${sec}s`;
     progress.style.width = `${((COUNTDOWN-sec)/COUNTDOWN)*100}%`;
-    if(sec <= 0){
+    if (sec <= 0){
       clearInterval(interval);
       timer.innerText = "Click to continue";
       btn.disabled = false;
     }
   },1000);
 
-  /* CLICK HANDLER */
+  // Click handler
   btn.onclick = async () => {
     btn.disabled = true;
     timer.innerText = "Redirecting...";
 
-    // Update Firestore first
+    // Update Firestore before redirect
     await updateDoc(userRef,{
       usedTokens: arrayUnion(tokenParam),
       usedLinks: arrayUnion(nextLink),
@@ -842,7 +844,7 @@ async function init() {
       lockedUntil: today
     });
 
-    // Redirect to link
+    // Redirect
     const redirectUrl = nextLink + `?uid=${uidParam}&token=${btoa(crypto.randomUUID()+"|"+Date.now())}`;
     window.location.href = redirectUrl;
   };
